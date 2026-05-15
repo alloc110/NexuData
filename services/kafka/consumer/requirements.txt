@@ -1,0 +1,4 @@
+confluent-kafka
+clickhouse-connect
+faker
+python-dateutil
