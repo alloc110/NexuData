@@ -1,0 +1,8 @@
+apache-airflow-providers-apache-spark
+apache-airflow-providers-trino 
+airflow-clickhouse-plugin
+confluent-kafka 
+sqlalchemy 
+pyarrow 
+faker 
+s3fs 

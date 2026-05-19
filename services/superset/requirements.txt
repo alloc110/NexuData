@@ -1,0 +1,3 @@
+trino
+sqlalchemy-trino
+psycopg2-binary

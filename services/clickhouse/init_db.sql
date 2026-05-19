@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS finhouse.fact_events(
     -- Chuyển về String vì Python gửi chuỗi "user_..."
-    user_id String, 
+    user_id UInt32, 
     
     -- UUID trong ClickHouse nên dùng kiểu UUID chuẩn để tiết kiệm bộ nhớ
     event_id UUID,
