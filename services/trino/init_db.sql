@@ -22,11 +22,11 @@ WITH (
 -- BẢNG 1: NGƯỜI DÙNG (USERS)
 ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS hive.metadata.users (
-    user_id varchar,
+    user_id integer,
     username varchar,
     email varchar,
     full_name varchar,
-    created_at timestamp, -- Để mặc định để Trino tự làm tròn từ file Parquet
+    created_at timestamp, 
     date varchar
 )
 WITH (
@@ -123,21 +123,21 @@ CALL hive.system.sync_partition_metadata(
 -- =========================================================================
 DROP TABLE IF EXISTS hive.metadata.fact_events;
 
-CREATE TABLE IF NOT EXISTS hive.metadata.fact_events (
-    event_id varchar,       -- Được cast thành String/Varchar từ hàm toString() trong Airflow
-    user_id varchar,
-    product_id integer,     -- Kiểu UInt32 của ClickHouse ánh xạ sang tương đương Integer
-    event_type varchar,     -- Kiểu LowCardinality(String) sang Trino chỉ cần Varchar
-    platform varchar,
-    occurred_at integer,  -- Giữ nguyên kiểu thời gian
-    date varchar            -- Cột phân vùng (lấy từ thư mục date={{ ds }} do Airflow tạo)
+CREATE TABLE hive.metadata.fact_events (
+    event_id VARCHAR,      
+    user_id integer,         -- Ánh xạ từ UInt32 sang số nguyên lớn của Trino
+    product_id integer,      -- Ánh xạ từ UInt32 sang số nguyên lớn của Trino
+    event_type VARCHAR,     
+    platform VARCHAR,       
+    occurred_at BIGINT,     -- Giữ nguyên Epoch giây (Số nguyên) để tránh lỗi kén kiểu DateTime
+    date VARCHAR,           -- Cột phân vùng thư mục cha (date=2026-05-20)
+    hour VARCHAR            -- Cột phân vùng thư mục con (hour=02)
 )
 WITH (
     format = 'PARQUET',
-    partitioned_by = ARRAY['date'],
+    partitioned_by = ARRAY['date', 'hour'],
     external_location = 's3a://finhouse-datalake/bronze/events/fact_events/'
 );
-
 -- Tự động quét phân vùng ban đầu nếu có sẵn dữ liệu lịch sử trên MinIO
 CALL hive.system.sync_partition_metadata(
     schema_name => 'metadata', 
@@ -157,10 +157,10 @@ DROP TABLE IF EXISTS hive.silver.fact_enriched_events;
 -- 3. Tạo bảng cấu trúc chuẩn đã được làm giàu (Enriched)
 CREATE TABLE hive.silver.fact_enriched_events (
     event_id varchar,
-    occurred_at timestamp,   -- Kiểu thời gian chuẩn yyyy-mm-dd hh:mm:ss
+    occurred_at timestamp,
     event_type varchar,
     platform varchar,
-    user_id varchar,
+    user_id integer,
     username varchar,
     full_name varchar,
     product_id integer,
@@ -168,10 +168,30 @@ CREATE TABLE hive.silver.fact_enriched_events (
     product_price double,
     category_name varchar,
     store_name varchar,
-    date varchar             -- Cột phân vùng chính
+    date varchar,
+    hour varchar  -- 1. Khai báo cột chính ở đây
 )
 WITH (
     format = 'PARQUET',
-    partitioned_by = ARRAY['date'],
+    partitioned_by = ARRAY['date', 'hour'], -- 2. Đưa vào mảng phân vùng ở đây
     external_location = 's3a://finhouse-datalake/silver/fact_enriched_events/'
+);
+
+
+CREATE SCHEMA IF NOT EXISTS hive.gold WITH (location = 's3a://finhouse-datalake/gold/');
+
+CREATE TABLE IF NOT EXISTS hive.gold.dm_store_performance (
+    store_name varchar,
+    category_name varchar,
+    total_views bigint,
+    total_purchases bigint,
+    total_revenue double,
+    conversion_rate double,
+    date varchar,
+    hour varchar
+)
+WITH (
+    format = 'PARQUET',
+    partitioned_by = ARRAY['date', 'hour'],
+    external_location = 's3a://finhouse-datalake/gold/dm_store_performance/'
 );

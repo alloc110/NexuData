@@ -28,11 +28,11 @@ mc cp /tmp/.keep myminio/finhouse-datalake/bronze/metadata/categories/
 mc cp /tmp/.keep myminio/finhouse-datalake/bronze/events/fact_events/
 
 # Tầng Silver
-mc cp /tmp/.keep myminio/finhouse-datalake/silver/wide_events_enriched/
+mc cp /tmp/.keep myminio/finhouse-datalake/silver/fact_enriched_events/
 
 # Tầng Gold
-mc cp /tmp/.keep myminio/finhouse-datalake/gold/store_daily_performance/
-mc cp /tmp/.keep myminio/finhouse-datalake/gold/user_conversion_funnel/
+mc cp /tmp/.keep myminio/finhouse-datalake/gold/dm_store_performance/
+mc cp /tmp/.keep myminio/finhouse-datalake/gold/dm_user_funnel/
 
 echo "================================================="
 echo "Hoàn tất xây dựng móng Data Lakehouse cho Finhouse!"

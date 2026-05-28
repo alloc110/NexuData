@@ -14,6 +14,7 @@ if __name__ == "__main__":
         .config("spark.hadoop.fs.s3a.access.key", "admin") \
         .config("spark.hadoop.fs.s3a.secret.key", "supersecretpassword") \
         .config("spark.hadoop.fs.s3a.path.style.access", "true") \
+        .master("spark://spark-master:7077") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .getOrCreate()
 
@@ -28,7 +29,7 @@ if __name__ == "__main__":
             F.count(F.when(F.col("event_type") == "PURCHASE", 1)).alias("total_purchases"),
             F.sum(F.when(F.col("event_type") == "PURCHASE", F.col("product_price")).otherwise(0)).alias("total_revenue")
         ) \
-        .withColumn("conversion_rate", F.col("total_purchases") / F.replace(F.col("total_views"), 0, None)) \
+        .withColumn("conversion_rate", F.when(F.col("total_views") == 0, 0).otherwise(F.col("total_purchases") / F.col("total_views")))\
         .withColumn("date", F.lit(execution_date)) \
         .withColumn("hour", F.lit(execution_hour))
 

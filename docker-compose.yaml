@@ -19,7 +19,8 @@ services:
       - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://admin:admin@clickhouse:9000
       - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
       - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
-
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
+      - TZ=Asia/Ho_Chi_Minh # Ép hệ điều hành trong container chạy theo giờ Việt Nam
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -50,7 +51,8 @@ services:
       - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://admin:admin@clickhouse:9000
       - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
       - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
-
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
+      - TZ=Asia/Ho_Chi_Minh 
   airflow-worker:
     build: ./services/airflow/
     command: celery worker
@@ -74,7 +76,8 @@ services:
       - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://admin:admin@clickhouse:9000
       - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
       - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
-
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
+      - TZ=Asia/Ho_Chi_Minh 
   airflow-flower:
     build: ./services/airflow/
     container_name: airflow-flower
@@ -85,7 +88,8 @@ services:
       - airflow-webserver
     networks:
       - finhouse-network
-
+    environment:
+      - TZ=Asia/Ho_Chi_Minh 
   airflow-db:
     image: postgres:15
     container_name: airflow_db
@@ -93,6 +97,7 @@ services:
       POSTGRES_DB: airflow
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
+      TZ: Asia/Ho_Chi_Minh 
     volumes:
       - airflow_db_data:/var/lib/postgresql/data
     networks:
@@ -117,6 +122,8 @@ services:
       - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://finhouse:finhouse@clickhouse:9000
       - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
       - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
+      - TZ=Asia/Ho_Chi_Minh 
     entrypoint: /bin/bash
     command: >
       -c "
@@ -153,6 +160,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      TZ: Asia/Ho_Chi_Minh 
     volumes:
       - kafka_data:/var/lib/kafka/data
 
@@ -166,6 +174,7 @@ services:
       - "8085:8081"
     environment:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      TZ: Asia/Ho_Chi_Minh 
     depends_on:
       - kafka
     networks:
@@ -179,6 +188,7 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      TZ: Asia/Ho_Chi_Minh 
     depends_on:
       - kafka
     networks:
@@ -195,7 +205,8 @@ services:
         condition: service_started
     networks:
     - finhouse-network
-  
+    environment:
+      TZ: Asia/Ho_Chi_Minh 
     # =========================
   # DATA STACK
   # =========================
@@ -211,6 +222,7 @@ services:
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: supersecretpassword
+      TZ: Asia/Ho_Chi_Minh 
     volumes:
       - minio_data:/data
       - ./services/trino/catalog:/etc/trino/catalog
@@ -239,6 +251,7 @@ services:
       POSTGRES_USER: hive
       POSTGRES_PASSWORD: hive123
       POSTGRES_DB: metastore
+      TZ: Asia/Ho_Chi_Minh 
     ports:
       - "5433:5432"
     networks:
@@ -261,6 +274,7 @@ services:
       AWS_ACCESS_KEY_ID: admin
       AWS_SECRET_ACCESS_KEY: supersecretpassword
       AWS_REGION: us-east-1
+      TZ: Asia/Ho_Chi_Minh 
     ports:
       - "9083:9083"
     networks:
@@ -277,6 +291,8 @@ services:
     entrypoint: [ "/bin/sh", "/docker-init/entrypoint.sh" ]
     depends_on:
       - hive-metastore
+    environment:
+      TZ: Asia/Ho_Chi_Minh 
     networks:
       - finhouse-network
   # =========================
@@ -289,6 +305,8 @@ services:
       - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+    environment:
+      TZ: Asia/Ho_Chi_Minh 
     networks:
       - finhouse-network
 
@@ -299,6 +317,8 @@ services:
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
+    environment:
+      TZ: Asia/Ho_Chi_Minh 
     networks:
       - finhouse-network
 
@@ -313,12 +333,14 @@ services:
     environment:
       SUPERSET_SECRET_KEY: supersecretkey
       SUPERSET_DATABASE_URI: postgresql+psycopg2://superset:superset@superset-db:5432/superset
+      TZ: Asia/Ho_Chi_Minh 
 
     depends_on:
       - trino
       - superset-db
     volumes:
       - superset_home:/app/superset_home
+ 
     networks:
       - finhouse-network
   superset-db:
@@ -330,7 +352,7 @@ services:
       POSTGRES_DB: superset
       POSTGRES_USER: superset
       POSTGRES_PASSWORD: superset
-
+      TZ: Asia/Ho_Chi_Minh 
     volumes:
       - superset_db:/var/lib/postgresql/data
 
@@ -349,6 +371,7 @@ services:
       POSTGRES_DB: finhouse
       POSTGRES_USER: finhouse
       POSTGRES_PASSWORD: finhouse
+      TZ: Asia/Ho_Chi_Minh 
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./services/postgres/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
@@ -374,6 +397,7 @@ services:
       CLICKHOUSE_DB: finhouse
       CLICKHOUSE_USER: admin
       CLICKHOUSE_PASSWORD: admin
+      TZ: Asia/Ho_Chi_Minh 
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./services/clickhouse/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
@@ -390,9 +414,11 @@ services:
       timeout: 5s
       retries: 5
   spark-master:
-    image: apache/spark:4.2.0-preview5-scala2.13-java17-python3-ubuntu
+    image: apache/spark:3.5.1-scala2.12-java17-python3-ubuntu
     container_name: spark-master
     hostname: spark-master
+    environment:
+      TZ: Asia/Ho_Chi_Minh 
     command: >
       /opt/spark/bin/spark-class
       org.apache.spark.deploy.master.Master
@@ -405,15 +431,16 @@ services:
       - finhouse-network
 
   spark-worker:
-    image: apache/spark:4.2.0-preview5-scala2.13-java17-python3-ubuntu
+    image: apache/spark:3.5.1-scala2.12-java17-python3-ubuntu  
     container_name: spark-worker
     hostname: spark-worker
-    command: >
-      /opt/spark/bin/spark-class
-      org.apache.spark.deploy.worker.Worker
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1024m
+      - TZ=Asia/Ho_Chi_Minh 
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
     depends_on:
       - spark-master
     networks:

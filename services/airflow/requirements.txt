@@ -4,5 +4,6 @@ airflow-clickhouse-plugin
 confluent-kafka 
 sqlalchemy 
 pyarrow 
+pyspark
 faker 
 s3fs 
