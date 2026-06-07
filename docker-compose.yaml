@@ -24,6 +24,8 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+
     depends_on:
       - airflow-db
       - redis
@@ -41,6 +43,8 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+
     networks:
       - finhouse-network
     environment:
@@ -63,6 +67,8 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+
       - /var/run/docker.sock:/var/run/docker.sock
 
     networks:
@@ -414,7 +420,7 @@ services:
       timeout: 5s
       retries: 5
   spark-master:
-    image: apache/spark:3.5.1-scala2.12-java17-python3-ubuntu
+    build: ./services/spark/
     container_name: spark-master
     hostname: spark-master
     environment:
@@ -431,7 +437,7 @@ services:
       - finhouse-network
 
   spark-worker:
-    image: apache/spark:3.5.1-scala2.12-java17-python3-ubuntu  
+    build: ./services/spark/ 
     container_name: spark-worker
     hostname: spark-worker
     environment:

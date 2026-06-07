@@ -11,5 +11,5 @@ with DAG(
 
     generate_events = BashOperator(
         task_id="generate_events",
-        bash_command="python /opt/airflow/dags/src/producer.py"
+        bash_command="python /opt/airflow/dags/src/random_events.py"
     )

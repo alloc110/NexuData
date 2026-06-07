@@ -1,6 +1,6 @@
-DROP TABLE IF EXISTS finhouse.fact_events;
+DROP TABLE IF EXISTS finhouse.events;
 
-CREATE TABLE finhouse.fact_events (
+CREATE TABLE finhouse.events (
     event_id UUID,                -- Giữ nguyên UUID để hứng ID log sự kiện từ App/Kafka
     user_id UInt32,               -- Khớp hoàn toàn với SERIAL (INT) của Postgres
     product_id UInt32,            -- Khớp hoàn toàn với SERIAL (INT) của Postgres

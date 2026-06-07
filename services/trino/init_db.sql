@@ -121,9 +121,9 @@ CALL hive.system.sync_partition_metadata(
 -- =========================================================================
 -- 6. BẢNG SỰ KIỆN (FACT_EVENTS)
 -- =========================================================================
-DROP TABLE IF EXISTS hive.metadata.fact_events;
+DROP TABLE IF EXISTS hive.metadata.events;
 
-CREATE TABLE hive.metadata.fact_events (
+CREATE TABLE hive.metadata.events (
     event_id VARCHAR,      
     user_id integer,         -- Ánh xạ từ UInt32 sang số nguyên lớn của Trino
     product_id integer,      -- Ánh xạ từ UInt32 sang số nguyên lớn của Trino
@@ -136,12 +136,12 @@ CREATE TABLE hive.metadata.fact_events (
 WITH (
     format = 'PARQUET',
     partitioned_by = ARRAY['date', 'hour'],
-    external_location = 's3a://finhouse-datalake/bronze/events/fact_events/'
+    external_location = 's3a://finhouse-datalake/bronze/events/'
 );
 -- Tự động quét phân vùng ban đầu nếu có sẵn dữ liệu lịch sử trên MinIO
 CALL hive.system.sync_partition_metadata(
     schema_name => 'metadata', 
-    table_name => 'fact_events', 
+    table_name => 'events', 
     mode => 'ADD'
 );
 
@@ -152,46 +152,112 @@ CREATE SCHEMA IF NOT EXISTS hive.silver
 WITH (location = 's3a://finhouse-datalake/silver/');
 
 -- 2. Xóa bảng cũ nếu tồn tại để tránh xung đột cấu trúc khi dev
-DROP TABLE IF EXISTS hive.silver.fact_enriched_events;
+DROP TABLE IF EXISTS hive.silver.wide_table_events;
 
 -- 3. Tạo bảng cấu trúc chuẩn đã được làm giàu (Enriched)
-CREATE TABLE hive.silver.fact_enriched_events (
-    event_id varchar,
-    occurred_at timestamp,
-    event_type varchar,
-    platform varchar,
-    user_id integer,
-    username varchar,
-    full_name varchar,
-    product_id integer,
-    product_name varchar,
-    product_price double,
-    category_name varchar,
-    store_name varchar,
-    date varchar,
-    hour varchar  -- 1. Khai báo cột chính ở đây
-)
-WITH (
-    format = 'PARQUET',
-    partitioned_by = ARRAY['date', 'hour'], -- 2. Đưa vào mảng phân vùng ở đây
-    external_location = 's3a://finhouse-datalake/silver/fact_enriched_events/'
-);
-
-
-CREATE SCHEMA IF NOT EXISTS hive.gold WITH (location = 's3a://finhouse-datalake/gold/');
-
-CREATE TABLE IF NOT EXISTS hive.gold.dm_store_performance (
-    store_name varchar,
-    category_name varchar,
-    total_views bigint,
-    total_purchases bigint,
-    total_revenue double,
-    conversion_rate double,
-    date varchar,
-    hour varchar
+CREATE TABLE hive.silver.wide_table_events (
+    event_id VARCHAR,
+    occurred_at TIMESTAMP(3),
+    event_type VARCHAR,
+    platform VARCHAR,
+    user_id BIGINT,          -- Chuyển sang BIGINT
+    username VARCHAR,
+    full_name VARCHAR,
+    product_id BIGINT,       -- Chuyển sang BIGINT
+    email VARCHAR,           -- Đặt đúng vị trí tường minh
+    user_created_at TIMESTAMP(3),
+    product_name VARCHAR,
+    product_price DOUBLE,
+    category_name VARCHAR,
+    store_name VARCHAR,
+    date VARCHAR,
+    hour VARCHAR
 )
 WITH (
     format = 'PARQUET',
     partitioned_by = ARRAY['date', 'hour'],
-    external_location = 's3a://finhouse-datalake/gold/dm_store_performance/'
+    external_location = 's3a://finhouse-datalake/silver/wide_table_events/'
+);
+
+CREATE SCHEMA IF NOT EXISTS hive.gold WITH (location = 's3a://finhouse-datalake/gold/');
+
+
+-- 2. Khởi tạo cấu trúc bảng dim_customer_profile
+CREATE TABLE IF NOT EXISTS hive.gold.dim_customer_profile (
+    customer_id VARCHAR,
+    fullname VARCHAR,
+    email VARCHAR,
+    created_at TIMESTAMP,
+    last_active_date DATE,
+    total_transactions BIGINT,
+    primary_device VARCHAR,
+    date VARCHAR,
+    hour VARCHAR
+)
+WITH (
+    format = 'PARQUET',
+    partitioned_by = ARRAY['date', 'hour'],
+    external_location = 's3a://finhouse-datalake/gold/dim_customer_profile/'
+);
+
+
+-- 2. Xóa bảng cũ nếu có để làm sạch cấu trúc
+
+-- 3. Tạo bảng Gold Funnel với cấu trúc chuẩn từ Spark đổ về
+CREATE TABLE hive.gold.fact_funnel_conversion (
+    log_date VARCHAR,
+    device_type VARCHAR,
+    step_1_visit BIGINT,
+    step_2_view_product BIGINT,
+    step_3_initiate_checkout BIGINT,
+    step_4_purchase_success BIGINT,
+    conversion_rate_overall DOUBLE,
+    date VARCHAR, -- Cột phân vùng thư mục cha
+    hour VARCHAR  -- Cột phân vùng thư mục con
+)
+WITH (
+    format = 'PARQUET',
+    partitioned_by = ARRAY['date', 'hour'],
+    external_location = 's3a://finhouse-datalake/gold/fact_funnel_conversion/'
+);
+
+
+-- 3. Tạo bảng Gold Funnel với cấu trúc chuẩn từ Spark đổ về
+
+-- 3. Tạo bảng Fact RFM chuẩn Data Mart
+CREATE TABLE hive.gold.fact_rfm_segments (
+    customer_id VARCHAR,
+    recency_value INT,
+    frequency_value INT,
+    monetary_value DOUBLE,             -- Kiểu số thực để lưu tổng số tiền giao dịch
+    r_score INT,
+    f_score INT,
+    m_score INT,
+    rfm_cell VARCHAR,                  -- Ví dụ: '555', '112'
+    segment_name VARCHAR,              -- Ví dụ: 'Champions', 'Hibernating'
+    date VARCHAR,                      -- Cột phân vùng thư mục cha (Airflow Execution Date)
+    hour VARCHAR                       -- Cột phân vùng thư mục con (Airflow Execution Hour)
+)
+WITH (
+    format = 'PARQUET',
+    partitioned_by = ARRAY['date', 'hour'],
+    external_location = 's3a://finhouse-datalake/gold/fact_rfm_segments/'
+);
+
+
+-- 3. Khởi tạo cấu trúc bảng Fact Session Performance Daily
+CREATE TABLE hive.gold.fact_session_performance (
+    log_date VARCHAR,
+    total_sessions BIGINT,
+    total_users BIGINT,
+    bounce_sessions BIGINT,
+    bounce_rate DOUBLE,
+    avg_events_per_session DOUBLE,
+    operating_system VARCHAR,
+    date VARCHAR -- Cột Partition Key nằm cuối cùng
+)
+WITH (
+    format = 'PARQUET',
+    partitioned_by = ARRAY['date'],
+    external_location = 's3a://finhouse-datalake/gold/fact_session_performance/'
 );

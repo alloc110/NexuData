@@ -1,96 +1,131 @@
+from datetime import datetime
+import json
+import logging
 import os
+import time
+
 import pandas as pd
 import psycopg2
-from datetime import datetime
+import s3fs  # Dùng để check file tồn tại trên MinIO/S3
+import sys
+sys.path.append("/opt/airflow/plugins")
+from utils.logger_utils import get_logger
+
+# Khởi tạo logger tập trung theo chuẩn dự án
+logger = get_logger("PostgreSQLToMinIO", "MetadataExtractor")
 
 # ==========================================
-# CẤU HÌNH KẾT NỐI (Lấy từ biến môi trường nếu có, hoặc fix cứng)
+# CẤU HÌNH KẾT NỐI (Môi trường hoặc Mặc định)
 # ==========================================
+PG_HOST = os.getenv("PG_HOST", "postgres")
+PG_PORT = os.getenv("PG_PORT", "5432")
+PG_USER = os.getenv("PG_USER", "finhouse")
+PG_PASSWORD = os.getenv("PG_PASSWORD", "finhouse")
+PG_DB = os.getenv("PG_DB", "finhouse")
 
-# Cấu hình PostgreSQL
-PG_HOST = "postgres"
-PG_PORT = "5432"
-PG_USER = "finhouse"
-PG_PASSWORD = "finhouse"
-PG_DB = "finhouse"
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "admin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "supersecretpassword")
+MINIO_BUCKET = os.getenv("MINIO_BUCKET", "finhouse-datalake")
 
-# Cấu hình MinIO (S3 Compatible)
-MINIO_ENDPOINT = "http://minio:9000"
-MINIO_ACCESS_KEY = "admin"
-MINIO_SECRET_KEY = "supersecretpassword"
-MINIO_BUCKET = "finhouse-datalake"
-
-# Danh sách các bảng cần lấy
 TABLES_TO_EXTRACT = ["users", "categories", "stores", "products"]
 
 def get_pg_connection():
     """Tạo kết nối tới PostgreSQL"""
-    return psycopg2.connect(
-        host=PG_HOST,
-        port=PG_PORT,
-        user=PG_USER,
-        password=PG_PASSWORD,
-        dbname=PG_DB
-    )
+    try:
+        return psycopg2.connect(
+            host=PG_HOST, port=PG_PORT, user=PG_USER, password=PG_PASSWORD, dbname=PG_DB
+        )
+    except Exception as e:
+        record = logging.LogRecord("PostgresClient", logging.CRITICAL, "", 0, "Failed to connect to PostgreSQL", None, None)
+        record.extra_data = {"error_details": str(e)}
+        logger.handle(record)
+        raise e
 
 def extract_table_to_parquet(table_name: str, execution_date: str):
     """
-    Hàm đọc nguyên một bảng từ Postgres và ghi thẳng thành file Parquet trên MinIO
+    Đọc dữ liệu từ Postgres và ghi vào MinIO. 
+    Bỏ qua (Skip) nếu file của ngày hôm đó đã tồn tại (Idempotent Constraint).
     """
-    print(f"🚀 Bắt đầu xử lý bảng: {table_name}")
+    start_time = time.time()
+    s3_path = f"s3://{MINIO_BUCKET}/bronze/metadata/{table_name}/date={execution_date}/{table_name}_full.parquet"
     
-    conn = get_pg_connection()
+    # 1. KHỞI TẠO S3 FILESYSTEM ĐỂ KIỂM TRA FILE TRÊN MINIO
+    fs = s3fs.S3FileSystem(
+        key=MINIO_ACCESS_KEY,
+        secret=MINIO_SECRET_KEY,
+        client_kwargs={"endpoint_url": MINIO_ENDPOINT}
+    )
     
     try:
-        # 1. Đọc dữ liệu từ Postgres vào Pandas DataFrame
-        # Lưu ý: Nếu bảng siêu to (triệu dòng), nên dùng chunksize. Ở đây ta lấy hết (Full Load)
+        # KIỂM TRA ĐIỀU KIỆN: Nếu file đã tồn tại thì THOÁT SỚM (Early Return)
+        path_without_s3 = s3_path.replace("s3://", "")
+        if fs.exists(path_without_s3):
+            skip_record = logging.LogRecord("ExtractorJob", logging.INFO, "", 0, f"Table '{table_name}' already extracted for date {execution_date}. Skipping task.", None, None)
+            skip_record.extra_data = {
+                "extraction_target": {"table": table_name, "date": execution_date},
+                "status": "SKIPPED",
+                "storage": {"destination_path": s3_path}
+            }
+            logger.handle(skip_record)
+            return  # Thoát hàm luôn, không tốn tài nguyên chạy xuống dưới
+
+        # 2. TIẾN HÀNH BẮT ĐẦU PIPELINE NẾU CHƯA CÓ FILE
+        start_table_record = logging.LogRecord("ExtractorJob", logging.INFO, "", 0, f"Starting extraction for table: {table_name}", None, None)
+        start_table_record.extra_data = {"extraction_target": {"table": table_name, "layer": "bronze"}}
+        logger.handle(start_table_record)
+        
+        conn = get_pg_connection()
         query = f"SELECT * FROM {table_name}"
-        print(f"   Đang đọc dữ liệu từ DB...")
         df = pd.read_sql(query, conn)
+        conn.close()
         
         row_count = len(df)
         if row_count == 0:
-            print(f"   ⚠️ Bảng {table_name} đang trống, bỏ qua.")
+            warn_record = logging.LogRecord("ExtractorJob", logging.WARNING, "", 0, f"Table {table_name} contains 0 records. Skipping upload.", None, None)
+            logger.handle(warn_record)
             return
 
-        print(f"   Đã đọc {row_count} dòng. Chuẩn bị đẩy lên MinIO...")
-        
-        # 2. Xây dựng đường dẫn (Prefix) lưu file trên MinIO theo chuẩn Bronze
-        # Định dạng: bronze/metadata/{tên_bảng}/date={YYYY-MM-DD}/data.parquet
-        s3_path = f"s3://{MINIO_BUCKET}/bronze/metadata/{table_name}/date={execution_date}/{table_name}_full.parquet"
-        
-        # 3. Cấu hình S3 filesystem (trỏ về MinIO cục bộ thay vì AWS thật)
+        # 3. GHI FILE LÊN MINIO
         storage_options = {
             "key": MINIO_ACCESS_KEY,
             "secret": MINIO_SECRET_KEY,
-            "client_kwargs": {
-                "endpoint_url": MINIO_ENDPOINT
-            }
+            "client_kwargs": {"endpoint_url": MINIO_ENDPOINT}
         }
         
-        # 4. Ghi trực tiếp DataFrame thành file Parquet lên MinIO
-        df.to_parquet(
-            s3_path,
-            engine="pyarrow",
-            index=False,
-            storage_options=storage_options
-        )
+        df.to_parquet(s3_path, engine="pyarrow", index=False, storage_options=storage_options)
         
-        print(f"   ✅ Thành công! Đã lưu tại: {s3_path}")
+        duration = time.time() - start_time
+        
+        # BÁO CÁO THÀNH CÔNG
+        success_record = logging.LogRecord("ExtractorJob", logging.INFO, "", 0, f"Successfully extracted and loaded table: {table_name}", None, None)
+        success_record.extra_data = {
+            "metrics": {"rows_extracted": row_count, "duration_seconds": round(duration, 4)},
+            "status": "SUCCESS",
+            "storage": {"destination_path": s3_path, "table_name": table_name}
+        }
+        logger.handle(success_record)
         
     except Exception as e:
-        print(f"   ❌ Lỗi khi xử lý bảng {table_name}: {e}")
-    finally:
-        conn.close()
+        error_record = logging.LogRecord("ExtractorJob", logging.ERROR, "", 0, f"Pipeline execution failed for table: {table_name}", None, None)
+        error_record.extra_data = {"table_name": table_name, "error_details": str(e)}
+        logger.handle(error_record)
 
+# ==========================================
+# LUỒNG CHẠY CHÍNH (MAIN EXECUTION)
+# ==========================================
 if __name__ == "__main__":
-    # Lấy ngày hiện tại (dùng để chia partition thư mục trên MinIO)
-    # Nếu chạy trong Airflow, bạn sẽ truyền tham số {{ ds }} vào thay vì lấy today()
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_date = datetime.utcnow().strftime("%Y-%m-%d")
+    job_start_time = time.time()
     
-    print(f"=== BẮT ĐẦU ĐỒNG BỘ DỮ LIỆU NGÀY: {current_date} ===")
+    init_record = logging.LogRecord("MainPipeline", logging.INFO, "", 0, "Initializing metadata synchronization batch job", None, None)
+    init_record.extra_data = {"job_metadata": {"execution_date": current_date, "target_tables": TABLES_TO_EXTRACT}}
+    logger.handle(init_record)
     
     for table in TABLES_TO_EXTRACT:
         extract_table_to_parquet(table, current_date)
         
-    print("=== HOÀN TẤT ĐỒNG BỘ! ===")
+    total_duration = time.time() - job_start_time
+    finish_record = logging.LogRecord("MainPipeline", logging.INFO, "", 0, "Metadata synchronization batch job process finished", None, None)
+    finish_record.extra_data = {"summary": {"total_duration_seconds": round(total_duration, 4), "execution_date": current_date}}
+    logger.handle(finish_record)

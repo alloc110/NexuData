@@ -42,7 +42,6 @@ CREATE TABLE products (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(15,2) NOT NULL,
-    stock_quantity INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_product_store FOREIGN KEY (store_id) REFERENCES stores (store_id),
     CONSTRAINT fk_product_category FOREIGN KEY (category_id) REFERENCES categories (category_id)
