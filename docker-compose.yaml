@@ -13,19 +13,18 @@ services:
       - "8080:8080"
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-db:5432/airflow
-      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://admin:admin@clickhouse:9000
-      - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
-      - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
-      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
-      - TZ=Asia/Ho_Chi_Minh # Ép hệ điều hành trong container chạy theo giờ Việt Nam
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
+      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=${AIRFLOW_CONN_CLICKHOUSE_FINHOUSE}
+      - AIRFLOW_CONN_TRINO_FINHOUSE=${AIRFLOW_CONN_TRINO_FINHOUSE}
+      - AIRFLOW_CONN_POSTGRES_FINHOUSE=${AIRFLOW_CONN_POSTGRES_FINHOUSE}
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=${AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER}
+      - TZ=${TIMEZONE}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-
     depends_on:
       - airflow-db
       - redis
@@ -34,7 +33,6 @@ services:
     
   airflow-scheduler:
     user: "${AIRFLOW_UID:-50000}:0"
-
     build: ./services/airflow/
     container_name: airflow-scheduler
     command: scheduler
@@ -44,19 +42,19 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-
     networks:
       - finhouse-network
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-db:5432/airflow
-      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://admin:admin@clickhouse:9000
-      - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
-      - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
-      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
-      - TZ=Asia/Ho_Chi_Minh 
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
+      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=${AIRFLOW_CONN_CLICKHOUSE_FINHOUSE}
+      - AIRFLOW_CONN_TRINO_FINHOUSE=${AIRFLOW_CONN_TRINO_FINHOUSE}
+      - AIRFLOW_CONN_POSTGRES_FINHOUSE=${AIRFLOW_CONN_POSTGRES_FINHOUSE}
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=${AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER}
+      - TZ=${TIMEZONE}
+
   airflow-worker:
     build: ./services/airflow/
     command: celery worker
@@ -68,22 +66,20 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-
       - /var/run/docker.sock:/var/run/docker.sock
-
     networks:
       - finhouse-network
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
+      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=${AIRFLOW_CONN_CLICKHOUSE_FINHOUSE}
+      - AIRFLOW_CONN_TRINO_FINHOUSE=${AIRFLOW_CONN_TRINO_FINHOUSE}
+      - AIRFLOW_CONN_POSTGRES_FINHOUSE=${AIRFLOW_CONN_POSTGRES_FINHOUSE}
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=${AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER}
+      - TZ=${TIMEZONE}
 
-      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://admin:admin@clickhouse:9000
-      - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
-      - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
-      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
-      - TZ=Asia/Ho_Chi_Minh 
   airflow-flower:
     build: ./services/airflow/
     container_name: airflow-flower
@@ -95,15 +91,16 @@ services:
     networks:
       - finhouse-network
     environment:
-      - TZ=Asia/Ho_Chi_Minh 
+      - TZ=${TIMEZONE}
+
   airflow-db:
     image: postgres:15
     container_name: airflow_db
     environment:
-      POSTGRES_DB: airflow
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      TZ: Asia/Ho_Chi_Minh 
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      TZ: ${TIMEZONE}
     volumes:
       - airflow_db_data:/var/lib/postgresql/data
     networks:
@@ -114,6 +111,7 @@ services:
     container_name: redis
     networks:
       - finhouse-network
+
   airflow-init:
     build: ./services/airflow/
     container_name: airflow-init
@@ -122,14 +120,14 @@ services:
       - redis
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-db:5432/airflow
-      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=generic://finhouse:finhouse@clickhouse:9000
-      - AIRFLOW_CONN_TRINO_FINHOUSE=trino://admin@trino:8080/hive
-      - AIRFLOW_CONN_POSTGRES_FINHOUSE=postgresql://finhouse:finhouse@postgres:5432/finhouse
-      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=spark://spark-master:7077
-      - TZ=Asia/Ho_Chi_Minh 
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
+      - AIRFLOW_CONN_CLICKHOUSE_FINHOUSE=${AIRFLOW_CONN_CLICKHOUSE_FINHOUSE}
+      - AIRFLOW_CONN_TRINO_FINHOUSE=${AIRFLOW_CONN_TRINO_FINHOUSE}
+      - AIRFLOW_CONN_POSTGRES_FINHOUSE=${AIRFLOW_CONN_POSTGRES_FINHOUSE}
+      - AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER=${AIRFLOW_CONN_SPARK_STANDALONE_CLUSTER}
+      - TZ=${TIMEZONE}
     entrypoint: /bin/bash
     command: >
       -c "
@@ -144,7 +142,8 @@ services:
       "
     restart: "no"
     networks:
-    - finhouse-network
+      - finhouse-network
+
   # =========================
   # KAFKA (KRaft)
   # =========================
@@ -152,8 +151,7 @@ services:
     image: apache/kafka:3.7.0
     container_name: kafka
     ports:
-    - "9092:9092"
-
+      - "9092:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -166,10 +164,9 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      TZ: Asia/Ho_Chi_Minh 
+      TZ: ${TIMEZONE}
     volumes:
       - kafka_data:/var/lib/kafka/data
-
     networks:
       - finhouse-network
 
@@ -180,7 +177,7 @@ services:
       - "8085:8081"
     environment:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
-      TZ: Asia/Ho_Chi_Minh 
+      TZ: ${TIMEZONE}
     depends_on:
       - kafka
     networks:
@@ -194,15 +191,15 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      TZ: Asia/Ho_Chi_Minh 
+      TZ: ${TIMEZONE}
     depends_on:
       - kafka
     networks:
       - finhouse-network
+
   consumer:
     build: ./services/kafka/consumer
     container_name: consumer
-    
     restart: always
     depends_on:
       clickhouse:
@@ -210,41 +207,37 @@ services:
       kafka:
         condition: service_started
     networks:
-    - finhouse-network
+      - finhouse-network
     environment:
-      TZ: Asia/Ho_Chi_Minh 
-    # =========================
+      TZ: ${TIMEZONE}
+
+  # =========================
   # DATA STACK
   # =========================
-
   minio:
     image: minio/minio
-  
     container_name: minio
     command: server /data --console-address ":9001"
     ports:
       - "9002:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: supersecretpassword
-      TZ: Asia/Ho_Chi_Minh 
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      TZ: ${TIMEZONE}
     volumes:
       - minio_data:/data
       - ./services/trino/catalog:/etc/trino/catalog
-
     networks:
       - finhouse-network
+
   minio-init:
     image: minio/minio
     container_name: minio_setup
     depends_on:
       - minio
     volumes:
-      # Ánh xạ file entrypoint.sh từ máy tính vào bên trong container
       - ./services/minio/entrypoint.sh:/entrypoint.sh
-
-    # Chạy file sh vừa được đưa vào
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     networks:
       - finhouse-network
@@ -254,14 +247,15 @@ services:
     image: postgres:15
     container_name: postgres-metastore
     environment:
-      POSTGRES_USER: hive
-      POSTGRES_PASSWORD: hive123
-      POSTGRES_DB: metastore
-      TZ: Asia/Ho_Chi_Minh 
+      POSTGRES_USER: ${HIVE_DB_USER}
+      POSTGRES_PASSWORD: ${HIVE_DB_PASSWORD}
+      POSTGRES_DB: ${HIVE_DB_NAME}
+      TZ: ${TIMEZONE}
     ports:
       - "5433:5432"
     networks:
       - finhouse-network
+
   hive-metastore:
     build: ./services/hive
     container_name: hive-metastore
@@ -273,18 +267,19 @@ services:
       SERVICE_NAME: metastore
       DB_DRIVER: postgres
       SERVICE_OPTS: >
-        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres-metastore:5432/metastore
+        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres-metastore:5432/${HIVE_DB_NAME}
         -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
-        -Djavax.jdo.option.ConnectionUserName=hive
-        -Djavax.jdo.option.ConnectionPassword=hive123
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY: supersecretpassword
-      AWS_REGION: us-east-1
-      TZ: Asia/Ho_Chi_Minh 
+        -Djavax.jdo.option.ConnectionUserName=${HIVE_DB_USER}
+        -Djavax.jdo.option.ConnectionPassword=${HIVE_DB_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: ${AWS_DEFAULT_REGION}
+      TZ: ${TIMEZONE}
     ports:
       - "9083:9083"
     networks:
       - finhouse-network
+
   trino:
     image: trinodb/trino:475
     container_name: trino
@@ -298,33 +293,7 @@ services:
     depends_on:
       - hive-metastore
     environment:
-      TZ: Asia/Ho_Chi_Minh 
-    networks:
-      - finhouse-network
-  # =========================
-  # MONITORING
-  # =========================
-  grafana:
-    image: grafana/grafana:10.2.0
-    container_name: grafana
-    ports:
-      - "3001:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-    environment:
-      TZ: Asia/Ho_Chi_Minh 
-    networks:
-      - finhouse-network
-
-  prometheus:
-    image: prom/prometheus:v2.45.0
-    container_name: prometheus
-    volumes:
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    environment:
-      TZ: Asia/Ho_Chi_Minh 
+      TZ: ${TIMEZONE}
     networks:
       - finhouse-network
 
@@ -337,33 +306,30 @@ services:
     ports:
       - "8088:8088"
     environment:
-      SUPERSET_SECRET_KEY: supersecretkey
-      SUPERSET_DATABASE_URI: postgresql+psycopg2://superset:superset@superset-db:5432/superset
-      TZ: Asia/Ho_Chi_Minh 
-
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_DATABASE_URI: postgresql+psycopg2://${SUPERSET_DB_USER}:${SUPERSET_DB_PASSWORD}@superset-db:5432/${SUPERSET_DB_NAME}
+      TZ: ${TIMEZONE}
     depends_on:
       - trino
       - superset-db
     volumes:
       - superset_home:/app/superset_home
- 
     networks:
       - finhouse-network
+
   superset-db:
     image: postgres:15 
-
     container_name: superset-db
-
     environment:
-      POSTGRES_DB: superset
-      POSTGRES_USER: superset
-      POSTGRES_PASSWORD: superset
-      TZ: Asia/Ho_Chi_Minh 
+      POSTGRES_DB: ${SUPERSET_DB_NAME}
+      POSTGRES_USER: ${SUPERSET_DB_USER}
+      POSTGRES_PASSWORD: ${SUPERSET_DB_PASSWORD}
+      TZ: ${TIMEZONE}
     volumes:
       - superset_db:/var/lib/postgresql/data
-
     networks:
       - finhouse-network
+
   # =========================
   # POSTGRES
   # =========================
@@ -374,15 +340,15 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: finhouse
-      POSTGRES_USER: finhouse
-      POSTGRES_PASSWORD: finhouse
-      TZ: Asia/Ho_Chi_Minh 
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TIMEZONE}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./services/postgres/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "finhouse", "-d", "finhouse"]
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -400,10 +366,10 @@ services:
       - "8123:8123"   # HTTP
       - "9000:9000"   # Native client
     environment:
-      CLICKHOUSE_DB: finhouse
-      CLICKHOUSE_USER: admin
-      CLICKHOUSE_PASSWORD: admin
-      TZ: Asia/Ho_Chi_Minh 
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      TZ: ${TIMEZONE}
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./services/clickhouse/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
@@ -419,12 +385,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # =========================
+  # APACHE SPARK
+  # =========================
   spark-master:
     build: ./services/spark/
     container_name: spark-master
     hostname: spark-master
     environment:
-      TZ: Asia/Ho_Chi_Minh 
+      TZ: ${TIMEZONE}
     command: >
       /opt/spark/bin/spark-class
       org.apache.spark.deploy.master.Master
@@ -445,24 +415,23 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_CORES=1
       - SPARK_WORKER_MEMORY=1024m
-      - TZ=Asia/Ho_Chi_Minh 
+      - TZ=${TIMEZONE}
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
     depends_on:
       - spark-master
     networks:
       - finhouse-network
+
 # ===================== VOLUMES =====================
 volumes:
   airflow_db_data:
   kafka_data:
-  metabase_db_data:
-  grafana_data:
-  prometheus_data:
   minio_data:
   postgres_data:
   clickhouse_data:
   superset_home:
   superset_db:
+
 # ===================== NETWORK =====================
 networks:
   finhouse-network:
