@@ -23,9 +23,8 @@
 - [Repository Structure](#-repository-structure)
 - [High-level System Architecture](#-high-level-system-architecture)
 - [Prerequisites](#-prerequisites)
-- [Installation & Setup](#-installation--setup)
-- [Running the Application](#-running-the-application)
-- [Monitoring & Observability](#-monitoring--observability)
+- [Installation & Setup](#%EF%B8%8F-installation--setup)
+- [Monitoring & Observability](#%EF%B8%8F-monitoring--observability)
 - [Data Flow Pipeline](#-data-flow-pipeline)
 - [Demo Video](#-demo-video)
 
@@ -132,7 +131,7 @@
 
 - **Apache Superset**: Powers interactive data visualization, rendering business-critical dashboards with optimized, sub-second refresh rates.
 
-![Data Model Architecture](assets/images/data_model_architecture.png)
+![Schemal Architecture](assets/images/schemal.png)
 
 ---
 
@@ -237,18 +236,19 @@ trino://admin@trino:8080/hive
 
 You are now ready to go to **Dashboards** $\rightarrow$ + **DASHBOARD** to build real-time analytical charts, track clickstream pipelines, and monitor business-critical metrics processed by Apache Spark and stored across MinIO and ClickHouse.
 
-## 🌊 Data Flow Pipeline
+## 🌊 Data Model Architecture
 
-## ![Data Flow Pipeline](assets/images/data_flow_pipeline.png)
+![Data Model Architecture](assets/images/data_model.png)
+
 
 ## 🚢 Demo Video
 
 ### 1. High-Speed Interactive BI Dashboard
 
-Real-time user behavior analytics, RFM customer segmentation, and conversion funnel dashboards powered by Trino and Apache Superset.
-![Demo dashboard](assets/videos/dashboard.gif)
+Real-time user behavior analytics, RFM customer segmentation, and conversion funnel dashboards powered by Trino and Apache Superset.    \
+![Demo dashboard](assets/images/dashboard.png)
 
 ### 2. Airflow Orchestration & Pipeline Triggers
 
-An overview of the master data pipeline executing batch jobs, schema cataloging, and hot/cold tier synchronization.
+An overview of the master data pipeline executing batch jobs, schema cataloging, and hot/cold tier synchronization.     \
 ![Demo airflow](assets/videos/airflow.gif)
